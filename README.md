@@ -7,5 +7,4 @@ Each directory has a hidden .shelltree file that contains the fules for file pur
 
 ### TODO:
 - Add up total# files and total file size per directory and grand totals
-- Purge old archive files
-- Optimize ZipFileSystem
+- Optimize ZipFileSystem; queue files to be removed/archived
