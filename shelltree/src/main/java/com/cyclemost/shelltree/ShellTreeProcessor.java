@@ -1,8 +1,6 @@
 package com.cyclemost.shelltree;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -20,9 +18,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,12 +29,9 @@ import org.slf4j.LoggerFactory;
 public class ShellTreeProcessor {
   
   private static final Logger LOGGER = LoggerFactory.getLogger(ShellTreeProcessor.class);
-  
-  private static DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_hhmmss"); 
-
+  private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HHmmss"); 
   public static List<String> CONFIG_FILE_NAMES = Arrays.asList(new String[] {"shelltree.properties", ".shelltree"});
 
-  
   /**
    * Processes the specified path. The entire directory tree under the
    * specified path will be processed, recursively.
@@ -132,6 +124,7 @@ public class ShellTreeProcessor {
             if (archivePath != null) {
               if (addFileToZip(file, archivePath)) {
                 ++archiveCount;
+                LOGGER.info("Archived file: {}", file.getName());
               }
               else {
                 // archive failed; do not delete file
@@ -198,7 +191,7 @@ public class ShellTreeProcessor {
       return true;
     }    
     catch (Exception ex) {
-      LOGGER.error("Error adding {} to {}", file, zipFile, ex);
+      LOGGER.error("Error adding {} to {}", file.getName(), zipFile.getName(), ex);
       return false;
     }
   }
