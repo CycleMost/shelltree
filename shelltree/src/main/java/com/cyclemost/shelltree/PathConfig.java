@@ -1,5 +1,3 @@
-// Copyright (c) 2023 CPO Commerce, LLC
-//
 package com.cyclemost.shelltree;
 
 import java.io.File;
@@ -7,16 +5,13 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Holds values loaded from the .shelltree config file.
+ * 
  * @author dbridges
  */
 public class PathConfig {
-  
-  private static final Logger LOGGER = LoggerFactory.getLogger(PathConfig.class);
   
   private String filePattern;
   private boolean recursive;
@@ -24,6 +19,9 @@ public class PathConfig {
   private String archiveFolder;
   private long archiveAgeDays;
   
+  /**
+   * Creates an empty config.
+   */
   public PathConfig() {
   }
   

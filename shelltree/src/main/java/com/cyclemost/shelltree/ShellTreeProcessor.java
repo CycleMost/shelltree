@@ -25,7 +25,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Main logic for processing directories.
+ * 
  * @author dbridges
  */
 public class ShellTreeProcessor {
@@ -61,7 +62,7 @@ public class ShellTreeProcessor {
     try {
       if (configFile != null) {
         // config file exists in this folder; use those values.
-        // cascade parent values?
+        // TODO: cascade parent values?
         config = new PathConfig(configFile);
       }
       else {
@@ -87,7 +88,6 @@ public class ShellTreeProcessor {
         }
       }          
       
-      
     }
     catch (Exception ex) {
       LOGGER.error("Error processing path {};", path, ex);
@@ -104,18 +104,25 @@ public class ShellTreeProcessor {
   void performActions(String path, PathConfig config) throws IOException {
     LOGGER.debug("Actions for {}: {}", path, config);
     
+    FileSystem zipFileSystem = null;
     File archivePath = null;
+    Path archiveFolderPath = null;
     String archiveName = String.format("archive-%s.zip", DATE_FORMAT.format(new Date()));
     if (!StringUtils.isBlank(config.getArchiveFolder())) {
-      Path archiveFolderPath = Paths.get(path, config.getArchiveFolder());
+      archiveFolderPath = Paths.get(path, config.getArchiveFolder());
       archivePath = Paths.get(path, config.getArchiveFolder(), archiveName).toFile();
       if (!archiveFolderPath.toFile().exists()) {
         if (!archiveFolderPath.toFile().mkdir()) {
-          LOGGER.error("Could not create folder {}", archivePath);
+          LOGGER.error("Could not create folder {}", archiveFolderPath);
           // archive folder create failed, so don't delete files.
           return;
         }
       }
+      
+      // Create zip file system for archive file
+      Map<String, String> env = new HashMap<>();
+      env.put("create", String.valueOf(!archivePath.exists()));
+      zipFileSystem = FileSystems.newFileSystem(archivePath.toPath(), env);    
     }
     
     int archiveCount = 0;
@@ -124,32 +131,64 @@ public class ShellTreeProcessor {
     String filters[] = StringUtils.split(config.getFilePattern(), ";");
     FileFilter fileFilter = new WildcardFileFilter(filters);
     
-    // Process files
-    var files = Paths.get(path).toFile().listFiles();
-    for (var file : files) {
-      if (file.isFile() && !file.isHidden()) {
-        if (fileNameMatch(file, fileFilter, config)) {
-          // File pattern matches; check file age
-          long fileAge = fileAgeDays(file);
-          if (fileAge > config.getFileAgeDays() && config.getFileAgeDays() > 0) {
-            if (archivePath != null && !reportOnly) {
-              if (addFileToZip(file, archivePath)) {
-                ++archiveCount;
-                LOGGER.info("Archived file: {}", file.getName());
+    try {    
+      // Process files
+      var files = Paths.get(path).toFile().listFiles();
+      for (var file : files) {
+        if (file.isFile() && !file.isHidden()) {
+          if (fileNameMatch(file, fileFilter, config)) {
+            // File pattern matches; check file age
+            long fileAge = fileAgeDays(file);
+            if (fileAge > config.getFileAgeDays() && config.getFileAgeDays() > 0) {
+              if (zipFileSystem != null && !reportOnly) {
+                if (addFileToArchive(file, zipFileSystem)) {
+                  ++archiveCount;
+                  LOGGER.info("Archived file: {}", file.getName());
+                }
+                else {
+                  // archive failed; do not delete file
+                  continue;
+                }
               }
-              else {
-                // archive failed; do not delete file
-                continue;
+
+              LOGGER.info("Delete file {} ({} days old)", file.getName(), fileAge);
+              if (!reportOnly) {
+                if (file.delete()) {
+                  ++deleteCount;
+                }
+                else {
+                  LOGGER.error("Failed to delete {}", file);
+                }
               }
             }
-            
-            LOGGER.info("Delete file {} ({} days old)", file.getName(), fileAge);
-            if (!reportOnly) {
-              if (file.delete()) {
-                ++deleteCount;
-              }
-              else {
-                LOGGER.error("Failed to delete {}", file);
+          }
+        }
+      }
+    }
+    finally {
+      if (zipFileSystem != null) {
+        zipFileSystem.close();
+        // If no files added to .zip, delete it.
+        if (archiveCount == 0 && archivePath != null && archivePath.exists()) {
+          archivePath.delete();
+        }
+      }
+      
+    }
+    
+    LOGGER.info("Archived {} files, deleted {} files",  archiveCount, deleteCount);
+    
+    if (config.getArchiveAgeDays() > 0 && archiveFolderPath != null) {
+      // Purge archives
+      File archiveFolder = archiveFolderPath.toFile();
+      if (archiveFolder.exists()) {
+        for (File file : archiveFolder.listFiles()) {
+          if (isArchiveFile(file)) {
+            long fileAge = fileAgeDays(file);
+            if (fileAge > config.getArchiveAgeDays()) {
+              LOGGER.info("Delete archive file {} ({} days old)", file.getName(), fileAge);
+              if (!reportOnly) {
+                file.delete();
               }
             }
           }
@@ -157,8 +196,16 @@ public class ShellTreeProcessor {
       }
     }
     
-    LOGGER.info("Archived {} files, deleted {} files",  archiveCount, deleteCount);
-    
+  }
+  
+  /**
+   * Returns true if this file appears to be an archive file.
+   * 
+   * @param file
+   * @return 
+   */
+  private static boolean isArchiveFile(File file) {
+    return !file.isHidden() && file.getName().toLowerCase().endsWith(".zip");
   }
   
   /**
@@ -210,28 +257,21 @@ public class ShellTreeProcessor {
   }
   
   /**
-   * Adds the specified file to the specified zip file.
+   * Adds the specified file to the zip archive.
    * 
    * @param file
    * @param zipFile
    * @return
    * @throws IOException 
    */
-  static boolean addFileToZip(File file, File zipFile) throws IOException {
-    Map<String, String> env = new HashMap<String, String>();
-    // check if file exists
-    env.put("create", String.valueOf(!zipFile.exists()));
-    
-    // TODO: Assume it would be more efficient to create the file system
-    // in the calling process, to avoid doing it lots of times
-    
-    try (FileSystem zipfs = FileSystems.newFileSystem(zipFile.toPath(), env)) {
-      Path pathInZipFile = zipfs.getPath(file.getName());
+  static boolean addFileToArchive(File file, FileSystem zipFileSystem) throws IOException {
+    try {
+      Path pathInZipFile = zipFileSystem.getPath(file.getName());
       Files.copy(file.toPath(), pathInZipFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
       return true;
     }    
-    catch (Exception ex) {
-      LOGGER.error("Error adding {} to {}", file.getName(), zipFile.getName(), ex);
+    catch (IOException ex) {
+      LOGGER.error("Error archiving {}", file.getName(), ex);
       return false;
     }
   }
@@ -249,6 +289,5 @@ public class ShellTreeProcessor {
     Duration difference = Duration.between(fileInstant, now);
     return difference.toDays();    
   }
-  
   
 }

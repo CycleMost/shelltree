@@ -18,19 +18,22 @@ public class ShellTree {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ShellTree.class);
 
+  private static final String CMD_PATH = "path";
+  private static final String CMD_REPORT = "report";
+  
   public static void main(String[] args) throws ParseException {
 
     // Create command line options
     Options options = new Options();
     
-    Option processPathOption = Option.builder("path")
+    Option processPathOption = Option.builder(CMD_PATH)
                          .argName("path [path]...")
                          .hasArgs()
                          .desc("root path(s) to process")
                          .build();    
     options.addOption(processPathOption);
     
-    Option reportOnlyOption = Option.builder("report")
+    Option reportOnlyOption = Option.builder(CMD_REPORT)
                          .desc("run in report only mode")
                          .build();    
     options.addOption(reportOnlyOption);
@@ -40,12 +43,12 @@ public class ShellTree {
     CommandLine cmd = parser.parse(options, args);
 
     boolean reportOnly = false;
-    if (cmd.hasOption("report")) {
+    if (cmd.hasOption(CMD_REPORT)) {
       reportOnly = true;
     }
     
-    if (cmd.hasOption("path")) {
-      String paths[] = cmd.getOptionValues("path");
+    if (cmd.hasOption(CMD_PATH)) {
+      String paths[] = cmd.getOptionValues(CMD_PATH);
       processPathCommand(paths, reportOnly);
     } else {
       printHelp(options);
