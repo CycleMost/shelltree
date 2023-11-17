@@ -7,6 +7,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +77,12 @@ public class ShellTree {
 
       ShellTreeProcessor processor = new ShellTreeProcessor(reportOnly);
       processor.process(rootPath, null);
+      
+      LOGGER.info("Complete. Archived {} files, deleted {} files, {}",  
+        processor.getArchiveTotalCount(),
+        processor.getDeleteTotalCount(),
+        FileUtils.byteCountToDisplaySize(processor.getGrandTotalSize()));
+      
     }
     
   }

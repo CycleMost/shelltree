@@ -14,11 +14,13 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -37,6 +39,10 @@ public class ShellTreeProcessor {
 
   boolean reportOnly;
   
+  int archiveTotalCount = 0;
+  int deleteTotalCount = 0;
+  long grandTotalSize = 0;
+    
   public ShellTreeProcessor(boolean reportOnly) {
     this.reportOnly = reportOnly;
   }
@@ -102,9 +108,10 @@ public class ShellTreeProcessor {
    * @param config 
    */
   void performActions(String path, PathConfig config) throws IOException {
-    LOGGER.debug("Actions for {}: {}", path, config);
     
-    FileSystem zipFileSystem = null;
+    LOGGER.info( "Processing: {}", path);
+    LOGGER.debug("Config: {}", config);
+    
     File archivePath = null;
     Path archiveFolderPath = null;
     String archiveName = String.format("archive-%s.zip", DATE_FORMAT.format(new Date()));
@@ -117,69 +124,75 @@ public class ShellTreeProcessor {
           // archive folder create failed, so don't delete files.
           return;
         }
-      }
-      
-      // Create zip file system for archive file
-      Map<String, String> env = new HashMap<>();
-      env.put("create", String.valueOf(!archivePath.exists()));
-      zipFileSystem = FileSystems.newFileSystem(archivePath.toPath(), env);    
+      }  
     }
     
     int archiveCount = 0;
     int deleteCount = 0;
+    long totalSize = 0;
     
     String filters[] = StringUtils.split(config.getFilePattern(), ";");
     FileFilter fileFilter = new WildcardFileFilter(filters);
     
-    try {    
-      // Process files
-      var files = Paths.get(path).toFile().listFiles();
-      for (var file : files) {
-        if (file.isFile() && !file.isHidden()) {
-          if (fileNameMatch(file, fileFilter, config)) {
-            // File pattern matches; check file age
-            long fileAge = fileAgeDays(file);
-            if (fileAge > config.getFileAgeDays() && config.getFileAgeDays() > 0) {
-              if (zipFileSystem != null && !reportOnly) {
-                if (addFileToArchive(file, zipFileSystem)) {
-                  ++archiveCount;
-                  LOGGER.info("Archived file: {}", file.getName());
-                }
-                else {
-                  // archive failed; do not delete file
-                  continue;
-                }
-              }
+    List<File> filesToPurge = new ArrayList<>();
+    
+    // Process files
+    var files = Paths.get(path).toFile().listFiles();
+    for (var file : files) {
+      if (fileNameMatch(file, fileFilter, config)) {
+        // File pattern matches; check file age
+        long fileAge = fileAgeDays(file);
+        if (fileAge > config.getFileAgeDays() && config.getFileAgeDays() > 0) {
+          LOGGER.info("Delete file {} ({} days old)", file.getName(), fileAge);
+          filesToPurge.add(file);
+        }
+      }
+    }
 
-              LOGGER.info("Delete file {} ({} days old)", file.getName(), fileAge);
-              if (!reportOnly) {
-                if (file.delete()) {
-                  ++deleteCount;
-                }
-                else {
-                  LOGGER.error("Failed to delete {}", file);
-                }
-              }
-            }
+    if (reportOnly) {
+      return;
+    }
+    
+    // Archive files
+    if (!filesToPurge.isEmpty() && archivePath != null) {
+      Map<String, String> env = new HashMap<>();
+      env.put("create", String.valueOf(!archivePath.exists()));    
+      try (FileSystem zipFileSystem = FileSystems.newFileSystem(archivePath.toPath(), env)) {
+        for (File file : filesToPurge) {
+          if (addFileToArchive(file, zipFileSystem)) {
+            ++archiveCount;
+            LOGGER.info("Archived file: {}", file.getName());
+          }
+          else {
+            // archive failed; do not delete file
+            LOGGER.error("Archive failed for {}", file.getName());
           }
         }
       }
     }
-    finally {
-      if (zipFileSystem != null) {
-        zipFileSystem.close();
-        // If no files added to .zip, delete it.
-        if (archiveCount == 0 && archivePath != null && archivePath.exists()) {
-          archivePath.delete();
-        }
+    
+    // Delete files
+    for (File file : filesToPurge) {
+      try {
+        long fileSize = FileUtils.sizeOf(file);
+        Files.delete(file.toPath());
+        ++deleteCount;
+        totalSize += fileSize;      
       }
-      
+      catch (IOException ex) {
+        LOGGER.error("Error deleting {}", file, ex);
+      }
     }
+        
+    LOGGER.info("Archived {} files, deleted {} files, {}",  
+      archiveCount, deleteCount, FileUtils.byteCountToDisplaySize(totalSize));
     
-    LOGGER.info("Archived {} files, deleted {} files",  archiveCount, deleteCount);
+    archiveTotalCount += archiveCount;
+    deleteTotalCount += deleteCount;
+    grandTotalSize += totalSize;
     
+    // Purge archives
     if (config.getArchiveAgeDays() > 0 && archiveFolderPath != null) {
-      // Purge archives
       File archiveFolder = archiveFolderPath.toFile();
       if (archiveFolder.exists()) {
         for (File file : archiveFolder.listFiles()) {
@@ -188,7 +201,10 @@ public class ShellTreeProcessor {
             if (fileAge > config.getArchiveAgeDays()) {
               LOGGER.info("Delete archive file {} ({} days old)", file.getName(), fileAge);
               if (!reportOnly) {
-                file.delete();
+                long fileSize = FileUtils.sizeOf(file);
+                if (file.delete()) {
+                  grandTotalSize += fileSize;
+                }
               }
             }
           }
@@ -288,6 +304,22 @@ public class ShellTreeProcessor {
     Instant now = new Date().toInstant();
     Duration difference = Duration.between(fileInstant, now);
     return difference.toDays();    
+  }
+
+  public boolean isReportOnly() {
+    return reportOnly;
+  }
+
+  public int getArchiveTotalCount() {
+    return archiveTotalCount;
+  }
+
+  public int getDeleteTotalCount() {
+    return deleteTotalCount;
+  }
+
+  public long getGrandTotalSize() {
+    return grandTotalSize;
   }
   
 }
