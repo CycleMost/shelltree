@@ -1,6 +1,7 @@
 package com.cyclemost.shelltree;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -18,6 +19,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.filefilter.WildcardFileFilter;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +34,12 @@ public class ShellTreeProcessor {
   private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HHmmss"); 
   public static List<String> CONFIG_FILE_NAMES = Arrays.asList(new String[] {"shelltree.properties", ".shelltree"});
 
+  boolean reportOnly;
+  
+  public ShellTreeProcessor(boolean reportOnly) {
+    this.reportOnly = reportOnly;
+  }
+  
   /**
    * Processes the specified path. The entire directory tree under the
    * specified path will be processed, recursively.
@@ -39,7 +47,8 @@ public class ShellTreeProcessor {
    * @param path root path to begin processing
    * @param parentConfig options of parent folder, or null for none
    */
-  public static void process(String path, PathConfig parentConfig) {
+  public void process(String path, PathConfig parentConfig) {
+    
     File configFile = null;
     for (String configFileName : CONFIG_FILE_NAMES) {
       Path configPath = Paths.get(path, configFileName);
@@ -93,7 +102,7 @@ public class ShellTreeProcessor {
    * @param path
    * @param config 
    */
-  static void performActions(String path, PathConfig config) throws IOException {
+  void performActions(String path, PathConfig config) throws IOException {
     LOGGER.debug("Actions for {}: {}", path, config);
     
     File archivePath = null;
@@ -113,15 +122,18 @@ public class ShellTreeProcessor {
     int archiveCount = 0;
     int deleteCount = 0;
     
+    String filters[] = StringUtils.split(config.getFilePattern(), ";");
+    FileFilter fileFilter = new WildcardFileFilter(filters);
+    
     // Process files
     var files = Paths.get(path).toFile().listFiles();
     for (var file : files) {
       if (file.isFile() && !file.isHidden()) {
-        if (fileNameMatch(file, config)) {
+        if (fileNameMatch(file, fileFilter, config)) {
           // File pattern matches; check file age
           long fileAge = fileAgeDays(file);
           if (fileAge > config.getFileAgeDays()) {
-            if (archivePath != null) {
+            if (archivePath != null && !reportOnly) {
               if (addFileToZip(file, archivePath)) {
                 ++archiveCount;
                 LOGGER.info("Archived file: {}", file.getName());
@@ -132,20 +144,22 @@ public class ShellTreeProcessor {
               }
             }
             
-            LOGGER.info("Delete file {}", file.getName());
-            if (file.delete()) {
-              ++deleteCount;
-            }
-            else {
-              LOGGER.error("Failed to delete {}", file);
+            LOGGER.info("Delete file {} ({} days old)", file.getName(), fileAge);
+            if (!reportOnly) {
+              if (file.delete()) {
+                ++deleteCount;
+              }
+              else {
+                LOGGER.error("Failed to delete {}", file);
+              }
             }
           }
         }
       }
     }
     
-    LOGGER.info("Archived {} files, deleted {} files", archiveCount, deleteCount);
- 
+    LOGGER.info("Archived {} files, deleted {} files",  archiveCount, deleteCount);
+    
   }
   
   /**
@@ -159,14 +173,14 @@ public class ShellTreeProcessor {
    * @param config
    * @return 
    */
-  static boolean fileNameMatch(File file, PathConfig config) {
+  static boolean fileNameMatch(File file, FileFilter filter, PathConfig config) {
+  
+    boolean nameMatch = filter.accept(file);
     
-    boolean nameMatch = file.getName().matches(config.getFilePattern());
-    
-    return file.isFile() &&
+    return nameMatch && 
+           file.isFile() &&
            !CONFIG_FILE_NAMES.contains(file.getName()) &&
-           file.getName().compareToIgnoreCase(config.getArchiveFolder()) != 0 &&
-           nameMatch;
+           file.getName().compareToIgnoreCase(config.getArchiveFolder()) != 0;
   }
   
   /**

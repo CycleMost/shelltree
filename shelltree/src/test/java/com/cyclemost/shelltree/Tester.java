@@ -1,6 +1,10 @@
 package com.cyclemost.shelltree;
 
+import java.io.File;
+import java.io.FileFilter;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.io.filefilter.WildcardFileFilter;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -10,20 +14,25 @@ import org.junit.Test;
 public class Tester {
  
   @Test
+  @Ignore
   public void testCommand() throws ParseException {
     ShellTree.main(new String[] {"-path", "/Users/dbridges/CycleMost/shelltree/shelltree/src/main/resources/testroot"});
   }
   
   @Test
-  public void regexText() {
-  
-    String patterns[] = {"txt$", ".txt$", "\\.txt$", ".*\\.txt$"};
-    String test = "textfile.txt";
+  @Ignore
+  public void testWildcards() {
+
+    String fileNames[] = {"test.csv", "test.txt", "test.dat", "stuff.log"};
     
-    for (var pattern : patterns) {
-      System.out.println(String.format("%s: %s", pattern, test.matches(pattern)));
+    String filters[] = {"*"};
+    
+    FileFilter fileFilter = new WildcardFileFilter(filters);
+
+    for (var fileName : fileNames) {
+      System.out.println(String.format("%s: %s", fileName, fileFilter.accept(new File(fileName))));
     }
-  
+
   }
 }
   
