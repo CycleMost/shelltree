@@ -72,23 +72,22 @@ public class ShellTreeProcessor {
       // If we have config, perform actions on this path
       if (config != null) {
         performActions(path, config);
-
-        // Process subfolders
-        var files = Paths.get(path).toFile().listFiles();
-        for (var file : files) {
-          if (file.isDirectory() && 
-             !file.getName().startsWith(".") &&
-             !CONFIG_FILE_NAMES.contains(file.getName()) &&
-              file.getName().compareToIgnoreCase(config.getArchiveFolder()) != 0)
-          {
-            process(file.getAbsolutePath(), 
-                    config.isRecursive() ? config : null);
-          }
-        }          
       }
       else {
         LOGGER.debug("no config for {}", path);
+        config = new PathConfig();
       }
+      
+      // Process subfolders
+      var files = Paths.get(path).toFile().listFiles();
+      for (var file : files) {
+        if (isValidDirectory(file, config)) {
+          process(file.getAbsolutePath(), 
+                  config.isRecursive() ? config : null);
+        }
+      }          
+      
+      
     }
     catch (Exception ex) {
       LOGGER.error("Error processing path {};", path, ex);
@@ -132,7 +131,7 @@ public class ShellTreeProcessor {
         if (fileNameMatch(file, fileFilter, config)) {
           // File pattern matches; check file age
           long fileAge = fileAgeDays(file);
-          if (fileAge > config.getFileAgeDays()) {
+          if (fileAge > config.getFileAgeDays() && config.getFileAgeDays() > 0) {
             if (archivePath != null && !reportOnly) {
               if (addFileToZip(file, archivePath)) {
                 ++archiveCount;
@@ -165,9 +164,36 @@ public class ShellTreeProcessor {
   /**
    * Returns true if all of the following are true.
    * <ul>
-   * <li>File is not a properties file</li>
-   * <li>File name matches the config pattern </li>
+   * <li>File is a directory</li>
+   * <li>File is not hidden</li>
    * <li>File name is not the archive folder</li>
+   * </ul>
+   * 
+   * @param file
+   * @param config
+   * @return 
+   */
+  static boolean isValidDirectory(File file, PathConfig config) {
+    if (!file.isDirectory()) {
+      return false;
+    }
+    if (file.isHidden()) {
+      return false;
+    }
+    if (config.getArchiveFolder() != null) {
+      if (file.getName().equalsIgnoreCase(config.getArchiveFolder())) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  /**
+   * Returns true if all of the following are true.
+   * <ul>
+   * <li>File is not a properties file</li>
+   * <li>File is not hidden</li>
+   * <li>File name matches the config pattern </li>
    * </ul>
    * @param file
    * @param config
@@ -179,8 +205,8 @@ public class ShellTreeProcessor {
     
     return nameMatch && 
            file.isFile() &&
-           !CONFIG_FILE_NAMES.contains(file.getName()) &&
-           file.getName().compareToIgnoreCase(config.getArchiveFolder()) != 0;
+           !file.isHidden() &&
+           !CONFIG_FILE_NAMES.contains(file.getName());
   }
   
   /**
@@ -201,7 +227,7 @@ public class ShellTreeProcessor {
     
     try (FileSystem zipfs = FileSystems.newFileSystem(zipFile.toPath(), env)) {
       Path pathInZipFile = zipfs.getPath(file.getName());
-      Files.copy(file.toPath(), pathInZipFile, StandardCopyOption.REPLACE_EXISTING);
+      Files.copy(file.toPath(), pathInZipFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
       return true;
     }    
     catch (Exception ex) {

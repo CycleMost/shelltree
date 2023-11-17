@@ -24,9 +24,9 @@ public class ShellTree {
     Options options = new Options();
     
     Option processPathOption = Option.builder("path")
-                         .argName("path")
-                         .hasArg()
-                         .desc("root path to process")
+                         .argName("path [path]...")
+                         .hasArgs()
+                         .desc("root path(s) to process")
                          .build();    
     options.addOption(processPathOption);
     
@@ -45,8 +45,8 @@ public class ShellTree {
     }
     
     if (cmd.hasOption("path")) {
-      String values[] = cmd.getOptionValues("path");
-      processPathCommand(values, reportOnly);
+      String paths[] = cmd.getOptionValues("path");
+      processPathCommand(paths, reportOnly);
     } else {
       printHelp(options);
     }
@@ -58,21 +58,22 @@ public class ShellTree {
     formatter.printHelp(".", options);
   }
   
-  private static void processPathCommand(String[] values, boolean reportOnly) {
-    if (values == null || values.length == 0) {
+  private static void processPathCommand(String[] paths, boolean reportOnly) {
+    if (paths == null || paths.length == 0) {
       LOGGER.info("No path specified");
       return;
     }
     
-    String rootPath = values[0];
+    for (String rootPath : paths) {
     
-    LOGGER.debug("Starting at path: {}", rootPath);
-    if (reportOnly) {
-      LOGGER.info("Running in report-only mode; no changes will be made");
-    }    
-        
-    ShellTreeProcessor processor = new ShellTreeProcessor(reportOnly);
-    processor.process(rootPath, null);
+      LOGGER.debug("Starting at path: {}", rootPath);
+      if (reportOnly) {
+        LOGGER.info("Running in report-only mode; no changes will be made");
+      }    
+
+      ShellTreeProcessor processor = new ShellTreeProcessor(reportOnly);
+      processor.process(rootPath, null);
+    }
     
   }
 

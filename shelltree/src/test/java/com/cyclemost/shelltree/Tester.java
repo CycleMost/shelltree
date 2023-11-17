@@ -14,9 +14,13 @@ import org.junit.Test;
 public class Tester {
  
   @Test
-  @Ignore
   public void testCommand() throws ParseException {
-    ShellTree.main(new String[] {"-path", "/Users/dbridges/CycleMost/shelltree/shelltree/src/main/resources/testroot"});
+    //ShellTree.main(new String[] {});
+    ShellTree.main(new String[] {
+      //"-report", 
+      "-path", 
+      "/Users/dbridges/CycleMost/shelltree/shelltree/src/main/resources/testroot"
+    });
   }
   
   @Test

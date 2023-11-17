@@ -24,6 +24,9 @@ public class PathConfig {
   private String archiveFolder;
   private long archiveAgeDays;
   
+  public PathConfig() {
+  }
+  
   /**
    * Creates a new PathConfig object with values set by the 
    * specified Properties object.
