@@ -1,5 +1,3 @@
-// Copyright (c) 2023 CPO Commerce, LLC
-//
 package com.cyclemost.shelltree;
 
 import org.apache.commons.cli.ParseException;
@@ -13,7 +11,7 @@ public class Tester {
  
   @Test
   public void testCommand() throws ParseException {
-    ShellTree.main(new String[] {});
+    ShellTree.main(new String[] {"-path", "/Users/dbridges/CycleMost/shelltree/shelltree/src/main/resources/testroot"});
   }
   
 }

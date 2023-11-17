@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ShellTree {
 
-  // TODO Add apache command line utility
   private static final Logger LOGGER = LoggerFactory.getLogger(ShellTree.class);
 
   public static void main(String[] args) throws ParseException {
@@ -57,8 +56,8 @@ public class ShellTree {
     
     String rootPath = values[0];
     
-    LOGGER.debug("Processing path: {}", rootPath);
-    
+    LOGGER.debug("Starting at path: {}", rootPath);
+    ShellTreeProcessor.process(rootPath, null);
     
   }
 
