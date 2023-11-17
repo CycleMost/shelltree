@@ -6,5 +6,4 @@ shelltree is named based on the old DELTREE command in MS-DOS. DELTREE was used 
 Each directory has a hidden .shelltree file that contains the fules for file purging and archiving, as well as a recursive flag that indicates if child folders should inherit the same rules. If a child folder has its own .shelltree file then that will be used for that folder.
 
 ### TODO:
-- Add up total# files and total file size per directory and grand totals
-- Optimize ZipFileSystem; queue files to be removed/archived
+
