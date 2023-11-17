@@ -17,7 +17,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
@@ -165,10 +167,13 @@ public class ShellTreeProcessor {
    * @return 
    */
   static boolean fileNameMatch(File file, PathConfig config) {
+    
+    boolean nameMatch = file.getName().matches(config.getFilePattern());
+    
     return file.isFile() &&
            !CONFIG_FILE_NAMES.contains(file.getName()) &&
            file.getName().compareToIgnoreCase(config.getArchiveFolder()) != 0 &&
-           file.getName().matches(config.getFilePattern());
+           nameMatch;
   }
   
   /**
@@ -180,7 +185,14 @@ public class ShellTreeProcessor {
    * @throws IOException 
    */
   static boolean addFileToZip(File file, File zipFile) throws IOException {
-    try (FileSystem zipfs = FileSystems.newFileSystem(zipFile.toPath())) {
+    Map<String, String> env = new HashMap<String, String>();
+    // check if file exists
+    env.put("create", String.valueOf(!zipFile.exists()));
+    
+    // TODO: Assume it would be more efficient to create the file system
+    // in the calling process, to avoid doing it lots of times
+    
+    try (FileSystem zipfs = FileSystems.newFileSystem(zipFile.toPath(), env)) {
       Path pathInZipFile = zipfs.getPath(file.getName());
       Files.copy(file.toPath(), pathInZipFile, StandardCopyOption.REPLACE_EXISTING);
       return true;

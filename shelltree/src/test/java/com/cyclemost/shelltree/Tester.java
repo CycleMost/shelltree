@@ -14,4 +14,17 @@ public class Tester {
     ShellTree.main(new String[] {"-path", "/Users/dbridges/CycleMost/shelltree/shelltree/src/main/resources/testroot"});
   }
   
+  @Test
+  public void regexText() {
+  
+    String patterns[] = {"txt$", ".txt$", "\\.txt$", ".*\\.txt$"};
+    String test = "textfile.txt";
+    
+    for (var pattern : patterns) {
+      System.out.println(String.format("%s: %s", pattern, test.matches(pattern)));
+    }
+  
+  }
 }
+  
+
