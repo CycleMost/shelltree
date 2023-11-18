@@ -38,13 +38,14 @@ public class ShellTreeProcessor {
   public static List<String> CONFIG_FILE_NAMES = Arrays.asList(new String[] {"shelltree.properties", ".shelltree"});
 
   boolean reportOnly;
+  boolean pruneArchive;
   
   int archiveTotalCount = 0;
   int deleteTotalCount = 0;
   long grandTotalSize = 0;
+  int totalPathsProcessed = 0;
     
-  public ShellTreeProcessor(boolean reportOnly) {
-    this.reportOnly = reportOnly;
+  public ShellTreeProcessor() {
   }
   
   /**
@@ -55,6 +56,8 @@ public class ShellTreeProcessor {
    * @param parentConfig options of parent folder, or null for none
    */
   public void process(String path, PathConfig parentConfig) {
+    
+    ++totalPathsProcessed;
     
     File configFile = null;
     for (String configFileName : CONFIG_FILE_NAMES) {
@@ -81,7 +84,7 @@ public class ShellTreeProcessor {
         performActions(path, config);
       }
       else {
-        LOGGER.debug("no config for {}", path);
+        //LOGGER.debug("no config for {}", path);
         config = new PathConfig();
       }
       
@@ -111,32 +114,16 @@ public class ShellTreeProcessor {
     
     LOGGER.info( "Processing: {}", path);
     LOGGER.debug("Config: {}", config);
-    
-    File archivePath = null;
-    Path archiveFolderPath = null;
-    String archiveName = String.format("archive-%s.zip", DATE_FORMAT.format(new Date()));
-    if (!StringUtils.isBlank(config.getArchiveFolder())) {
-      archiveFolderPath = Paths.get(path, config.getArchiveFolder());
-      archivePath = Paths.get(path, config.getArchiveFolder(), archiveName).toFile();
-      if (!archiveFolderPath.toFile().exists()) {
-        if (!archiveFolderPath.toFile().mkdir()) {
-          LOGGER.error("Could not create folder {}", archiveFolderPath);
-          // archive folder create failed, so don't delete files.
-          return;
-        }
-      }  
-    }
-    
+        
     int archiveCount = 0;
     int deleteCount = 0;
     long totalSize = 0;
     
     String filters[] = StringUtils.split(config.getFilePattern(), ";");
     FileFilter fileFilter = new WildcardFileFilter(filters);
-    
+        
+    // Get list of files to be purged
     List<File> filesToPurge = new ArrayList<>();
-    
-    // Process files
     var files = Paths.get(path).toFile().listFiles();
     for (var file : files) {
       if (fileNameMatch(file, fileFilter, config)) {
@@ -154,7 +141,17 @@ public class ShellTreeProcessor {
     }
     
     // Archive files
-    if (!filesToPurge.isEmpty() && archivePath != null) {
+    Path archiveFolderPath = Paths.get(path, config.getArchiveFolder());
+    if (!filesToPurge.isEmpty() && config.isFileArchiveEnabled()) {
+      String archiveName = String.format("archive-%s.zip", DATE_FORMAT.format(new Date()));
+      File archivePath = Paths.get(path, config.getArchiveFolder(), archiveName).toFile();
+      if (!archiveFolderPath.toFile().exists()) {
+        if (!archiveFolderPath.toFile().mkdir()) {
+          LOGGER.error("Could not create folder {}", archiveFolderPath);
+          // archive folder create failed, so don't delete files.
+          return;
+        }
+      }  
       Map<String, String> env = new HashMap<>();
       env.put("create", String.valueOf(!archivePath.exists()));    
       try (FileSystem zipFileSystem = FileSystems.newFileSystem(archivePath.toPath(), env)) {
@@ -209,6 +206,33 @@ public class ShellTreeProcessor {
             }
           }
         }
+        
+        // If archive folder is empty, remove it
+        if (pruneArchive) {
+          boolean hasFiles = false;
+          List<File> trash = new ArrayList<>();
+          for (var file : archiveFolder.listFiles()) {
+            if (file.isFile() && !file.isHidden()) {
+              hasFiles = true;
+              break;
+            }
+            trash.add(file);
+          }
+          if (!hasFiles) {
+            try {
+              // All remaining files are hidden ones. trash them.
+              LOGGER.info("Removing empty archive folder {}", archiveFolder);
+              for (var file : trash) {
+                Files.delete(file.toPath());
+              }
+              Files.delete(archiveFolderPath);
+            }
+            catch (IOException ex) {
+              LOGGER.error("Could not prune {}", archiveFolder, ex);
+            }
+          }
+        }
+        
       }
     }
     
@@ -310,6 +334,10 @@ public class ShellTreeProcessor {
     return reportOnly;
   }
 
+  public void setReportOnly(boolean reportOnly) {
+    this.reportOnly = reportOnly;
+  }
+
   public int getArchiveTotalCount() {
     return archiveTotalCount;
   }
@@ -320,6 +348,18 @@ public class ShellTreeProcessor {
 
   public long getGrandTotalSize() {
     return grandTotalSize;
+  }
+
+  public int getTotalPathsProcessed() {
+    return totalPathsProcessed;
+  }
+
+  public boolean isPruneArchive() {
+    return pruneArchive;
+  }
+
+  public void setPruneArchive(boolean pruneArchive) {
+    this.pruneArchive = pruneArchive;
   }
   
 }

@@ -4,7 +4,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Holds values loaded from the .shelltree config file.
@@ -69,6 +72,31 @@ public class PathConfig {
       getArchiveFolder(),
       getArchiveAgeDays());
   }
+  
+  public boolean isFilePurgeEnabled() {
+    return fileAgeDays > 0;
+  }
+  
+  /**
+   * Returns a flag indicating whether purged files in this folder
+   * will be archived. 
+   * 
+   * @return 
+   */
+  public boolean isFileArchiveEnabled() {
+    return StringUtils.isBlank(archiveFolder) && fileAgeDays > 0;
+  }
+  
+  public List<String> getConfigWarnings() {
+    List<String> warnings = new ArrayList<>();
+    if (fileAgeDays < 1) {
+      warnings.add("fileAgeDays not defined");
+    }
+
+    return warnings;
+  }
+  
+  //// get/set methods
 
   public String getFilePattern() {
     return filePattern;

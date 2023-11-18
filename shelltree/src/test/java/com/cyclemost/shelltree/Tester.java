@@ -18,9 +18,11 @@ public class Tester {
   public void testCommand() throws ParseException {
     //ShellTree.main(new String[] {});
     ShellTree.main(new String[] {
-      "-report", 
-      "-path", 
-      "/Users/dbridges/CycleMost/shelltree/shelltree/src/main/resources/testroot"
+      //"-report", 
+      "-prune",
+      "-path",
+      "/mnt/projects"
+      //"/Users/dbridges/CycleMost/shelltree/shelltree/src/main/resources/testroot"
     });
   }
   
