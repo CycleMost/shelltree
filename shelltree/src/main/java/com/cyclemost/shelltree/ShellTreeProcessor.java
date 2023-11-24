@@ -129,7 +129,7 @@ public class ShellTreeProcessor {
       if (fileNameMatch(file, fileFilter, config)) {
         // File pattern matches; check file age
         long fileAge = fileAgeDays(file);
-        if (fileAge > config.getFileAgeDays() && config.getFileAgeDays() > 0) {
+        if (config.isFilePurgeEnabled() && fileAge > config.getFileAgeDays()) {
           LOGGER.info("Delete file {} ({} days old)", file.getName(), fileAge);
           filesToPurge.add(file);
         }
